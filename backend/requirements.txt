@@ -1,0 +1,37 @@
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database
+SQLAlchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+alembic==1.13.0
+psycopg2-binary==2.9.9  # PostgreSQL adapter (for Alembic sync operations)
+
+# Data Validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# Authentication
+PyJWT[crypto]==2.8.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+cryptography==41.0.7
+
+# Logging & Monitoring
+structlog==23.2.0
+prometheus-client==0.19.0
+
+# HTTP Client (for tests and webhooks)
+httpx==0.25.2
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
+# Code Quality (development only)
+black==23.12.0
+ruff==0.1.8
+mypy==1.7.1

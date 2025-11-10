@@ -1,0 +1,1956 @@
+openapi: 3.0.3
+info:
+  title: Disc Golf Tag League API
+  description: |
+    FastAPI backend for managing disc golf tag leagues with dynamic tag rankings,
+    JWT authentication, role-based access control, and fraud prevention through
+    score confirmation workflows.
+    
+    ## Authentication
+    Most endpoints require JWT authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+    
+    ## Rate Limiting
+    All authenticated endpoints are rate-limited to 50 requests per minute per user.
+    
+    ## Roles
+    - **Player**: Standard user with read access and ability to manage own data
+    - **TagMaster**: League creator with full permissions for their leagues
+    - **Assistant**: League-specific helper role with TagMaster permissions for assigned leagues
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@tagmaster.example.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.tagmaster.example.com
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and token management
+  - name: Players
+    description: Player account management
+  - name: Leagues
+    description: League creation and management
+  - name: Seasons
+    description: Season management within leagues
+  - name: Rounds
+    description: Round creation and management
+  - name: Participations
+    description: Player participation and attendance tracking
+  - name: Cards
+    description: Card creation and player grouping
+  - name: Scores
+    description: Score entry and confirmation
+  - name: Tags
+    description: Tag standings and rankings
+  - name: Bets
+    description: Bet tracking for rounds
+  - name: Assistants
+    description: League assistant management
+  - name: Health
+    description: Service health and monitoring
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from /auth/login endpoint
+  
+  schemas:
+    # Authentication Schemas
+    PlayerRegister:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+          example: player@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: SecurePass123
+          description: Must contain uppercase, lowercase, and number
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+          example: John Doe
+        bio:
+          type: string
+          maxLength: 1000
+          example: Disc golf enthusiast since 2020
+    
+    PlayerLogin:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: player@example.com
+        password:
+          type: string
+          format: password
+          example: SecurePass123
+    
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          example: 86400
+          description: Token expiration in seconds
+    
+    # Player Schemas
+    PlayerResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
+        email:
+          type: string
+          format: email
+          example: player@example.com
+        name:
+          type: string
+          example: John Doe
+        bio:
+          type: string
+          example: Disc golf enthusiast since 2020
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [Player, TagMaster]
+          example: [Player, TagMaster]
+        email_verified:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: 2025-01-15T10:30:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2025-01-15T10:30:00Z
+    
+    PlayerUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+          example: Jane Doe
+        bio:
+          type: string
+          maxLength: 1000
+          example: Updated bio
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: NewSecurePass123
+    
+    # League Schemas
+    LeagueCreate:
+      type: object
+      required:
+        - name
+        - visibility
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 255
+          example: Saturday Morning Tag League
+        description:
+          type: string
+          example: Competitive tag league for experienced players
+        rules:
+          type: string
+          example: PDGA rules apply. Minimum 3 rounds for eligibility.
+        visibility:
+          type: string
+          enum: [public, private]
+          example: public
+    
+    LeagueResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 223e4567-e89b-12d3-a456-426614174001
+        name:
+          type: string
+          example: Saturday Morning Tag League
+        description:
+          type: string
+          example: Competitive tag league for experienced players
+        rules:
+          type: string
+          example: PDGA rules apply. Minimum 3 rounds for eligibility.
+        visibility:
+          type: string
+          enum: [public, private]
+          example: public
+        organizer_id:
+          type: string
+          format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
+        organizer:
+          $ref: '#/components/schemas/PlayerResponse'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    LeagueUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 255
+        description:
+          type: string
+        rules:
+          type: string
+        visibility:
+          type: string
+          enum: [public, private]
+    
+    # Season Schemas
+    SeasonCreate:
+      type: object
+      required:
+        - name
+        - league_id
+        - start_date
+        - end_date
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 255
+          example: Spring 2025
+        league_id:
+          type: string
+          format: uuid
+          example: 223e4567-e89b-12d3-a456-426614174001
+        start_date:
+          type: string
+          format: date
+          example: 2025-03-01
+        end_date:
+          type: string
+          format: date
+          example: 2025-05-31
+        registration_open_date:
+          type: string
+          format: date
+          example: 2025-02-01
+        registration_close_date:
+          type: string
+          format: date
+          example: 2025-05-31
+    
+    SeasonResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Spring 2025
+        league_id:
+          type: string
+          format: uuid
+        league:
+          $ref: '#/components/schemas/LeagueResponse'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        registration_open_date:
+          type: string
+          format: date
+        registration_close_date:
+          type: string
+          format: date
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    # Round Schemas
+    RoundCreate:
+      type: object
+      required:
+        - season_id
+        - date
+        - course_name
+      properties:
+        season_id:
+          type: string
+          format: uuid
+          example: 323e4567-e89b-12d3-a456-426614174002
+        date:
+          type: string
+          format: date
+          example: 2025-03-15
+        course_name:
+          type: string
+          minLength: 3
+          maxLength: 255
+          example: Morley Field
+        location:
+          type: string
+          maxLength: 500
+          example: 2221 Morley Field Dr, San Diego, CA 92104
+        start_time:
+          type: string
+          format: time
+          example: "09:00:00"
+    
+    RoundResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        season_id:
+          type: string
+          format: uuid
+        creator_id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        course_name:
+          type: string
+          example: Morley Field
+        location:
+          type: string
+          example: 2221 Morley Field Dr, San Diego, CA 92104
+        start_time:
+          type: string
+          format: time
+          example: "09:00:00"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+        # Participation Schemas
+    ParticipationCreate:
+      type: object
+      required:
+        - player_id
+        - round_id
+      properties:
+        player_id:
+          type: string
+          format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
+        round_id:
+          type: string
+          format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174001
+        online_registration:
+          type: boolean
+          example: true
+          description: True for online pre-registration, false for direct physical participation
+    
+    PhysicalParticipation:      type: object
+      required:
+        - player_id
+      properties:
+        player_id:
+          type: string
+          format: uuid
+        bet_participations:
+          type: array
+          items:
+            $ref: '#/components/schemas/BetCreate'
+          description: Optional bets recorded during physical participation
+    
+    ParticipationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        player_id:
+          type: string
+          format: uuid
+        player:
+          $ref: '#/components/schemas/PlayerResponse'
+        round_id:
+          type: string
+          format: uuid
+        card_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [registered, checked_in, completed, dnf]
+          example: checked_in
+        online_registration_time:
+          type: string
+          format: date-time
+        physical_participation_time:
+          type: string
+          format: date-time
+        score:
+          type: integer
+          example: 65
+          description: Stroke count (lower is better)
+        score_entered_by_id:
+          type: string
+          format: uuid
+        score_entered_at:
+          type: string
+          format: date-time
+        score_confirmed:
+          type: boolean
+          example: false
+        score_confirmed_by_id:
+          type: string
+          format: uuid
+        score_confirmed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    # Card Schemas
+    CardCreate:
+      type: object
+      required:
+        - round_id
+        - player_ids
+      properties:
+        round_id:
+          type: string
+          format: uuid
+        player_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 3
+          maxItems: 6
+          description: List of player IDs (must have checked in physically)
+          example: 
+            - 123e4567-e89b-12d3-a456-426614174000
+            - 223e4567-e89b-12d3-a456-426614174001
+            - 323e4567-e89b-12d3-a456-426614174002
+    
+    CardResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        round_id:
+          type: string
+          format: uuid
+        creator_id:
+          type: string
+          format: uuid
+        creator:
+          $ref: '#/components/schemas/PlayerResponse'
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckinResponse'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    # Score Schemas
+    ScoreEntry:
+      type: object
+      required:
+        - scores
+      properties:
+        scores:
+          type: array
+          items:
+            type: object
+            required:
+              - player_id
+              - score
+            properties:
+              player_id:
+                type: string
+                format: uuid
+              score:
+                type: integer
+                minimum: 1
+                example: 65
+                description: Stroke count
+          description: Scores for all players in the card
+    
+    ScoreConfirmation:
+      type: object
+      required:
+        - card_id
+      properties:
+        card_id:
+          type: string
+          format: uuid
+        confirmed:
+          type: boolean
+          example: true
+    
+    # Tag Schemas
+    TagResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        player_id:
+          type: string
+          format: uuid
+        player:
+          $ref: '#/components/schemas/PlayerResponse'
+        season_id:
+          type: string
+          format: uuid
+        tag_number:
+          type: integer
+          example: 1
+          description: Tag position (1 is best)
+        assignment_date:
+          type: string
+          format: date-time
+        is_eligible:
+          type: boolean
+          example: true
+          description: Meets eligibility requirements (3 rounds, 1 in last 5)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    TagHistoryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tag_number:
+          type: integer
+          example: 3
+        player_id:
+          type: string
+          format: uuid
+        player:
+          $ref: '#/components/schemas/PlayerResponse'
+        season_id:
+          type: string
+          format: uuid
+        round_id:
+          type: string
+          format: uuid
+        assignment_date:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    
+    # Bet Schemas
+    BetCreate:
+      type: object
+      required:
+        - bet_type
+        - amount
+      properties:
+        bet_type:
+          type: string
+          enum: [ace_pot, ctp, challenge]
+          example: ace_pot
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          example: 5.00
+          description: Bet amount in currency
+        description:
+          type: string
+          maxLength: 500
+          example: Hole 7 CTP
+    
+    BetResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        player_id:
+          type: string
+          format: uuid
+        player:
+          $ref: '#/components/schemas/PlayerResponse'
+        round_id:
+          type: string
+          format: uuid
+        bet_type:
+          type: string
+          enum: [ace_pot, ctp, challenge]
+        amount:
+          type: number
+          format: decimal
+          example: 5.00
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    # Assistant Schemas
+    AssistantAssign:
+      type: object
+      required:
+        - player_id
+        - league_id
+      properties:
+        player_id:
+          type: string
+          format: uuid
+          description: Player to assign as assistant
+        league_id:
+          type: string
+          format: uuid
+          description: League for which player becomes assistant
+    
+    AssistantResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        player_id:
+          type: string
+          format: uuid
+        player:
+          $ref: '#/components/schemas/PlayerResponse'
+        league_id:
+          type: string
+          format: uuid
+        league:
+          $ref: '#/components/schemas/LeagueResponse'
+        assigned_by_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+    
+    # Pagination
+    PaginatedPlayers:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/PlayerResponse'
+    
+    PaginatedLeagues:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/LeagueResponse'
+    
+    PaginatedSeasons:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/SeasonResponse'
+    
+    PaginatedRounds:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/RoundResponse'
+    
+    PaginatedTags:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/TagResponse'
+    
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 100
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+        pages:
+          type: integer
+          example: 5
+    
+    # Error Schemas
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: Invalid credentials
+        error_code:
+          type: string
+          example: AUTH_INVALID_CREDENTIALS
+    
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+                example: ["body", "email"]
+              msg:
+                type: string
+                example: field required
+              type:
+                type: string
+                example: value_error.missing
+    
+    # Health Schema
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        database:
+          type: string
+          example: connected
+        timestamp:
+          type: string
+          format: date-time
+          example: 2025-11-09T10:30:00Z
+
+paths:
+  # Authentication Endpoints
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new player account
+      description: Create a new player account with email and password
+      operationId: registerPlayer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerRegister'
+      responses:
+        '201':
+          description: Player registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerResponse'
+        '400':
+          description: Invalid input or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+  
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with email and password
+      description: Authenticate and receive JWT token
+      operationId: loginPlayer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerLogin'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded (max 5 attempts per minute)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  # Player Endpoints
+  /api/v1/players/me:
+    get:
+      tags:
+        - Players
+      summary: Get current player profile
+      description: Retrieve authenticated player's profile information
+      operationId: getCurrentPlayer
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Player profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    put:
+      tags:
+        - Players
+      summary: Update current player profile
+      description: Update authenticated player's profile information
+      operationId: updateCurrentPlayer
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerUpdate'
+      responses:
+        '200':
+          description: Player profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerResponse'
+        '401':
+          description: Not authenticated
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+    
+    delete:
+      tags:
+        - Players
+      summary: Delete current player account
+      description: Soft delete authenticated player's account
+      operationId: deleteCurrentPlayer
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Player account deleted
+        '401':
+          description: Not authenticated
+        '409':
+          description: Cannot delete (has active leagues or tags)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /api/v1/players:
+    get:
+      tags:
+        - Players
+      summary: List all players
+      description: Get paginated list of all players (public profiles)
+      operationId: listPlayers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: search
+          in: query
+          description: Search by name or email
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Players retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPlayers'
+        '401':
+          description: Not authenticated
+  
+  /api/v1/players/{player_id}:
+    get:
+      tags:
+        - Players
+      summary: Get player by ID
+      description: Retrieve specific player's profile (read-only)
+      operationId: getPlayer
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: player_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Player profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  # League Endpoints
+  /api/v1/leagues:
+    get:
+      tags:
+        - Leagues
+      summary: List leagues
+      description: Get paginated list of leagues (public leagues + user's private leagues)
+      operationId: listLeagues
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: visibility
+          in: query
+          description: Filter by visibility
+          schema:
+            type: string
+            enum: [public, private]
+      responses:
+        '200':
+          description: Leagues retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLeagues'
+        '401':
+          description: Not authenticated
+    
+    post:
+      tags:
+        - Leagues
+      summary: Create new league
+      description: Create a new league (automatically assigns TagMaster role)
+      operationId: createLeague
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeagueCreate'
+      responses:
+        '201':
+          description: League created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeagueResponse'
+        '401':
+          description: Not authenticated
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+  
+  /api/v1/leagues/{league_id}:
+    get:
+      tags:
+        - Leagues
+      summary: Get league by ID
+      description: Retrieve specific league details
+      operationId: getLeague
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: league_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: League retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeagueResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: League not found
+    
+    put:
+      tags:
+        - Leagues
+      summary: Update league
+      description: Update league details (requires TagMaster or Assistant role for this league)
+      operationId: updateLeague
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: league_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeagueUpdate'
+      responses:
+        '200':
+          description: League updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeagueResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: League not found
+    
+    delete:
+      tags:
+        - Leagues
+      summary: Delete league
+      description: Soft delete league (requires TagMaster role, cannot delete if has active seasons)
+      operationId: deleteLeague
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: league_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: League deleted
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: League not found
+        '409':
+          description: Cannot delete (has active seasons)
+  
+  # Season Endpoints
+  /api/v1/seasons:
+    get:
+      tags:
+        - Seasons
+      summary: List seasons
+      description: Get paginated list of seasons
+      operationId: listSeasons
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: league_id
+          in: query
+          description: Filter by league
+          schema:
+            type: string
+            format: uuid
+        - name: active
+          in: query
+          description: Filter active seasons only
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Seasons retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSeasons'
+        '401':
+          description: Not authenticated
+    
+    post:
+      tags:
+        - Seasons
+      summary: Create new season
+      description: Create a new season within a league (requires TagMaster or Assistant role)
+      operationId: createSeason
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeasonCreate'
+      responses:
+        '201':
+          description: Season created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '422':
+          description: Validation error
+  
+  /api/v1/seasons/{season_id}:
+    get:
+      tags:
+        - Seasons
+      summary: Get season by ID
+      description: Retrieve specific season details
+      operationId: getSeason
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: season_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Season retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Season not found
+  
+  /api/v1/seasons/{season_id}/register:
+    post:
+      tags:
+        - Seasons
+      summary: Register for season
+      description: Register current player for a season (receives tag on first-come-first-served basis)
+      operationId: registerForSeason
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: season_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Season not found
+        '409':
+          description: Already registered
+  
+  # Round Endpoints
+  /api/v1/rounds:
+    get:
+      tags:
+        - Rounds
+      summary: List rounds
+      description: Get paginated list of rounds
+      operationId: listRounds
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: season_id
+          in: query
+          description: Filter by season
+          schema:
+            type: string
+            format: uuid
+        - name: date_from
+          in: query
+          description: Filter rounds from date
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: Filter rounds to date
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Rounds retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRounds'
+        '401':
+          description: Not authenticated
+    
+    post:
+      tags:
+        - Rounds
+      summary: Create new round
+      description: Create a new round (requires TagMaster or Assistant role)
+      operationId: createRound
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoundCreate'
+      responses:
+        '201':
+          description: Round created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '422':
+          description: Validation error
+  
+  /api/v1/rounds/{round_id}:
+    get:
+      tags:
+        - Rounds
+      summary: Get round by ID
+      description: Retrieve specific round details with cards and checkins
+      operationId: getRound
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: round_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Round retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Round not found
+    
+    delete:
+      tags:
+        - Rounds
+      summary: Delete round
+      description: Soft delete round (requires TagMaster or Assistant role)
+      operationId: deleteRound
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: round_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Round deleted
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Round not found
+  
+  # Checkin Endpoints
+  /api/v1/rounds/{round_id}/checkins:
+    get:
+      tags:
+        - Checkins
+      summary: List checkins for round
+      description: Get all checkins for a specific round
+      operationId: listCheckins
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: round_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter by checkin status
+          schema:
+            type: string
+            enum: [registered, checked_in, completed, dnf]
+      responses:
+        '200':
+          description: Checkins retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CheckinResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Round not found
+    
+    post:
+      tags:
+        - Checkins
+      summary: Create online registration
+      description: Pre-register for a round online (physical checkin still required)
+      operationId: createOnlineRegistration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: round_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Online registration created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckinResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Round not found
+        '409':
+          description: Already registered
+  
+  /api/v1/rounds/{round_id}/participations/physical:
+    post:
+      tags:
+        - Participations
+      summary: Perform physical check-in
+      description: Check in player physically at course (requires TagMaster or Assistant role)
+      operationId: performPhysicalParticipation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: round_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhysicalParticipation'
+      responses:
+        '201':
+          description: Physical participation recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipationResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Round or player not found
+  
+  /api/v1/participations/{participation_id}/dnf:
+    post:
+      tags:
+        - Participations
+      summary: Mark player as DNF
+      description: Mark player as Did Not Finish (requires card creator or TagMaster/Assistant)
+      operationId: markPlayerDNF
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: participation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Player marked as DNF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipationResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Participation not found
+  
+  # Card Endpoints
+  /api/v1/cards:
+    post:
+      tags:
+        - Cards
+      summary: Create card
+      description: Create a card with 3-6 players who have checked in physically
+      operationId: createCard
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardCreate'
+      responses:
+        '201':
+          description: Card created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '401':
+          description: Not authenticated
+        '400':
+          description: Invalid card (players not checked in, already on card, etc.)
+        '422':
+          description: Validation error
+  
+  /api/v1/cards/{card_id}:
+    get:
+      tags:
+        - Cards
+      summary: Get card by ID
+      description: Retrieve card details with players and scores
+      operationId: getCard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Card retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Card not found
+  
+  # Score Endpoints
+  /api/v1/cards/{card_id}/scores:
+    post:
+      tags:
+        - Scores
+      summary: Enter scores for card
+      description: Card creator enters scores for all players in their card
+      operationId: enterScores
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreEntry'
+      responses:
+        '200':
+          description: Scores entered (pending confirmation)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not card creator
+        '404':
+          description: Card not found
+        '400':
+          description: Invalid scores (players not in card, not checked in, etc.)
+  
+  /api/v1/cards/{card_id}/scores/confirm:
+    post:
+      tags:
+        - Scores
+      summary: Confirm card scores
+      description: Card member confirms scores (non-creator only)
+      operationId: confirmScores
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Scores confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Cannot confirm own scores
+        '404':
+          description: Card not found
+        '400':
+          description: Scores already confirmed or not entered
+  
+  # Tag Endpoints
+  /api/v1/seasons/{season_id}/tags:
+    get:
+      tags:
+        - Tags
+      summary: Get tag standings
+      description: Retrieve current tag standings for a season sorted by tag number
+      operationId: getTagStandings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: season_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: eligible_only
+          in: query
+          description: Show only eligible players (for end-of-season standings)
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Tag standings retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTags'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Season not found
+  
+  /api/v1/players/{player_id}/tags/history:
+    get:
+      tags:
+        - Tags
+      summary: Get player tag history
+      description: Retrieve complete tag history for a player across all seasons
+      operationId: getPlayerTagHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: player_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: season_id
+          in: query
+          description: Filter by season
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tag history retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TagHistoryResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Player not found
+  
+  # Bet Endpoints
+  /api/v1/rounds/{round_id}/bets:
+    get:
+      tags:
+        - Bets
+      summary: List bets for round
+      description: Get all bets for a specific round
+      operationId: listBets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: round_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: bet_type
+          in: query
+          description: Filter by bet type
+          schema:
+            type: string
+            enum: [ace_pot, ctp, challenge]
+      responses:
+        '200':
+          description: Bets retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BetResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Round not found
+  
+  # Assistant Endpoints
+  /api/v1/leagues/{league_id}/assistants:
+    get:
+      tags:
+        - Assistants
+      summary: List league assistants
+      description: Get all assistants for a league
+      operationId: listAssistants
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: league_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assistants retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssistantResponse'
+        '401':
+          description: Not authenticated
+        '404':
+          description: League not found
+    
+    post:
+      tags:
+        - Assistants
+      summary: Assign assistant
+      description: Grant Assistant role to a player for this league (requires TagMaster)
+      operationId: assignAssistant
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: league_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - player_id
+              properties:
+                player_id:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Assistant assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions (not TagMaster)
+        '404':
+          description: League or player not found
+        '409':
+          description: Already an assistant
+  
+  /api/v1/leagues/{league_id}/assistants/{player_id}:
+    delete:
+      tags:
+        - Assistants
+      summary: Revoke assistant
+      description: Remove Assistant role from a player for this league (requires TagMaster)
+      operationId: revokeAssistant
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: league_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: player_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Assistant revoked
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: League or assistant assignment not found
+  
+  # Health Endpoint
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check API and database health
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /metrics:
+    get:
+      tags:
+        - Health
+      summary: Prometheus metrics
+      description: Expose metrics for monitoring (Prometheus format)
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Metrics retrieved
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP http_requests_total Total HTTP requests
+                  # TYPE http_requests_total counter
+                  http_requests_total{method="GET",endpoint="/api/v1/players",status="200"} 1234
