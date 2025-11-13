@@ -59,10 +59,12 @@ Build a FastAPI Python backend API for disc golf tag league tracking system. The
 
 ### ✅ III. Test-First Development
 - Pytest framework specified for unit and integration tests
-- Test structure will mirror source structure
-- Contract tests for API endpoints
-- Integration tests for database operations
-- Unit tests for business logic (tag reassignment, eligibility)
+- Test structure will mirror source structure (tests/ mirrors app/)
+- Contract tests for API endpoints (HTTP request/response validation)
+- Integration tests for database operations (async SQLAlchemy with test database)
+- Unit tests for business logic (services, tag reassignment, eligibility, permissions)
+- Each phase includes dedicated test tasks after implementation completes
+- Test fixtures provide: database session, authenticated client, test data factories
 
 ### ✅ IV. Structured Planning & Research
 - Phase 0 will resolve: Database schema design, JWT implementation patterns, rate limiting strategy, monitoring setup, Docker configuration
@@ -161,12 +163,20 @@ backend/
 │   │   │   ├── bets.py       # Bet tracking
 │   │   │   ├── assistants.py # Assistant role management
 │   │   │   └── health.py     # Health check, metrics
-│   ├── services/              # Business logic
+│   ├── services/              # Business logic (service layer pattern)
 │   │   ├── __init__.py
 │   │   ├── auth.py           # JWT creation, password hashing
+│   │   ├── player.py         # Player operations (CRUD, validation)
+│   │   ├── league.py         # League operations
+│   │   ├── season.py         # Season operations
+│   │   ├── round.py          # Round operations
+│   │   ├── participation.py  # Participation/attendance operations
+│   │   ├── card.py           # Card management operations
+│   │   ├── score.py          # Score entry/confirmation operations
+│   │   ├── bet.py            # Bet tracking operations
+│   │   ├── assistant.py      # Assistant management operations
 │   │   ├── tag_assignment.py # Tag reassignment algorithm
 │   │   ├── eligibility.py    # Eligibility calculation
-│   │   ├── score_verification.py # Score confirmation logic
 │   │   └── permissions.py    # RBAC logic
 │   ├── middleware/            # FastAPI middleware
 │   │   ├── __init__.py
@@ -182,22 +192,36 @@ backend/
 │   └── exceptions.py          # Custom exception classes
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py           # Pytest fixtures
+│   ├── conftest.py           # Pytest fixtures (database, client, auth)
 │   ├── contract/             # API contract tests
-│   │   ├── test_auth.py
-│   │   ├── test_players.py
-│   │   ├── test_leagues.py
-│   │   ├── test_rounds.py
-│   │   └── test_tags.py
+│   │   ├── __init__.py
+│   │   ├── test_auth.py      # POST /auth/register, /auth/login
+│   │   ├── test_players.py   # GET/PUT/DELETE /players/me, GET /players
+│   │   ├── test_leagues.py   # GET/POST/PUT/DELETE /leagues, /seasons
+│   │   ├── test_rounds.py    # GET/POST/DELETE /rounds, /participations, /cards
+│   │   ├── test_scores.py    # POST /cards/{id}/scores, /scores/confirm
+│   │   ├── test_tags.py      # GET /tags, /tags/history
+│   │   ├── test_bets.py      # GET /rounds/{id}/bets
+│   │   └── test_assistants.py # GET/POST/DELETE /leagues/{id}/assistants
 │   ├── integration/          # Database integration tests
-│   │   ├── test_tag_reassignment.py
-│   │   ├── test_eligibility.py
-│   │   └── test_score_flow.py
+│   │   ├── __init__.py
+│   │   ├── test_tag_reassignment.py  # Full tag reassignment flow
+│   │   ├── test_eligibility.py       # Eligibility calculation
+│   │   └── test_score_flow.py        # Score entry to confirmation
 │   └── unit/                 # Unit tests
+│       ├── __init__.py
 │       ├── test_services/
-│       │   ├── test_tag_assignment.py
-│       │   └── test_permissions.py
+│       │   ├── __init__.py
+│       │   ├── test_player.py         # PlayerService methods
+│       │   ├── test_league.py         # LeagueService methods
+│       │   ├── test_season.py         # SeasonService methods
+│       │   ├── test_tag_assignment.py # Tag assignment algorithm
+│       │   ├── test_eligibility.py    # Eligibility logic
+│       │   └── test_permissions.py    # RBAC logic
 │       └── test_utils/
+│           ├── __init__.py
+│           ├── test_pagination.py
+│           └── test_validators.py
 ├── Dockerfile                # Multi-stage Docker build
 ├── requirements.txt          # Python dependencies
 ├── .env.example             # Environment variable template

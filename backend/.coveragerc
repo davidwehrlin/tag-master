@@ -1,0 +1,20 @@
+[run]
+source = app
+omit =
+    # Exclude all __init__.py files
+    */__init__.py
+    # Exclude simple middleware with no business logic
+    app/middleware/cors.py
+    # Exclude main application entry point (startup/shutdown logic tested in integration)
+    app/main.py
+
+[report]
+# Show missing lines for files with incomplete coverage
+show_missing = True
+# Skip files with 100% coverage in the report
+skip_covered = True
+# Exclude files with no executable code
+skip_empty = True
+
+[html]
+directory = htmlcov

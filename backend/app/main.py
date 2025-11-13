@@ -53,11 +53,9 @@ app.add_middleware(RateLimitMiddleware)  # Rate limiting per user
 # Include routers
 app.include_router(health_router, prefix="", tags=["health"])
 
-# Additional routers will be added in Phase 3:
-# app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
-# app.include_router(players_router, prefix="/api/v1/players", tags=["players"])
-# app.include_router(leagues_router, prefix="/api/v1/leagues", tags=["leagues"])
-# etc.
+# API v1 routers (Phase 3+)
+from app.api.v1 import api_router
+app.include_router(api_router)
 
 
 @app.get("/")
