@@ -108,14 +108,14 @@
 
 ### Testing for User Story 1
 
-- [X] T052 [P] [US1] Write unit tests for Player model in backend/tests/unit/test_player_model.py (test PlayerRole enum, email uniqueness, soft delete behavior, role management)
-- [ ] T053 [P] [US1] Write unit tests for PlayerService in backend/tests/unit/test_player_service.py (test register_player with duplicate email, authenticate_player with invalid password, update_player, soft_delete_player, list_players)
-- [ ] T054 [P] [US1] Write unit tests for password validation in backend/tests/unit/test_player_service.py (test password hashing, weak passwords rejected, password complexity requirements)
-- [ ] T055 [P] [US1] Write unit tests for player schemas in backend/tests/unit/test_player_schemas.py (test email validation, password validation, schema serialization)
-- [ ] T056 [P] [US1] Create test fixtures in backend/tests/conftest.py (async database session, test client, authenticated user factory)
-- [ ] T057 [P] [US1] Write contract tests for auth endpoints in backend/tests/contract/test_auth.py (test registration, login, invalid credentials, duplicate email)
-- [ ] T058 [P] [US1] Write contract tests for player endpoints in backend/tests/contract/test_players.py (test profile retrieval, update, soft delete, list with pagination)
-- [ ] T059 [US1] Write integration tests for player permissions in backend/tests/integration/test_player_permissions.py (test player can only update own profile, cannot access other profiles)
+- [x] T052 [P] [US1] Write unit tests for Player model in backend/tests/unit/test_player_model.py (test PlayerRole enum, email uniqueness, soft delete behavior, role management)
+- [x] T053 [P] [US1] Write unit tests for PlayerService in backend/tests/unit/test_player_service.py (test register_player with duplicate email, authenticate_player with invalid password, update_player, soft_delete_player, list_players)
+- [x] T054 [P] [US1] Write unit tests for password validation in backend/tests/unit/test_player_service.py (test password hashing, weak passwords rejected, password complexity requirements)
+- [x] T055 [P] [US1] Write unit tests for player schemas in backend/tests/unit/test_player_schemas.py (test email validation, password validation, schema serialization)
+- [x] T056 [P] [US1] Create test fixtures in backend/tests/conftest.py (async database session, test client, authenticated user factory)
+- [x] T057 [P] [US1] Write contract tests for auth endpoints in backend/tests/contract/test_auth.py (test registration, login, invalid credentials, duplicate email)
+- [x] T058 [P] [US1] Write contract tests for player endpoints in backend/tests/contract/test_players.py (test profile retrieval, update, soft delete, list with pagination)
+- [x] T059 [US1] Write integration tests for player permissions in backend/tests/integration/test_player_permissions.py (test player can only update own profile, cannot access other profiles)
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and tested - players can register, login, view/update profiles
 

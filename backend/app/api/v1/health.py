@@ -3,7 +3,7 @@ Health check and metrics endpoints.
 
 Provides service health status and Prometheus-compatible metrics.
 """
-import time
+from datetime import datetime
 from typing import Dict
 
 from fastapi import APIRouter, Depends
@@ -56,7 +56,7 @@ async def health_check(db: AsyncSession = Depends(get_db)) -> Dict[str, str]:
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status,
-        "timestamp": time.time()
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 

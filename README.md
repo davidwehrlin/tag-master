@@ -8,7 +8,12 @@ A FastAPI-based backend for managing disc golf tag leagues with dynamic rankings
 
 ```bash
 # From repository root
-docker-compose up -d
+# `docker compose` will load variables from the project-level `.env` file
+# (located at the repository root) for variable substitution. Edit that file
+# to configure the Postgres instance used by Compose (for example:
+# `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`). The application also
+# uses `backend/.env` (copy from `backend/.env.example`) for runtime settings.
+docker compose up -d
 ```
 
 API will be available at: http://localhost:8000

@@ -9,26 +9,27 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.services.auth import decode_access_token
 
-# OAuth2 scheme for bearer token authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# HTTP Bearer token security scheme for JWT authentication
+# This displays a simple "Bearer token" input in Swagger instead of OAuth2 password form
+security = HTTPBearer(description="JWT Bearer token")
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ):
     """
     FastAPI dependency that extracts and validates the current user from JWT token.
     
     Args:
-        token: JWT bearer token from Authorization header
+        credentials: HTTP Bearer credentials from Authorization header
         db: Database session
         
     Returns:
@@ -47,6 +48,9 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # Extract token from Bearer credentials
+    token = credentials.credentials
     
     # Decode JWT token
     payload = decode_access_token(token)

@@ -8,6 +8,10 @@ from typing import List
 
 from pydantic import Field, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+
+# Directory of the backend package (used to locate backend/.env reliably)
+BASE_DIR = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
@@ -19,9 +23,10 @@ class Settings(BaseSettings):
     """
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore",
     )
     
     # Database

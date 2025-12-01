@@ -33,6 +33,15 @@ def hash_password(password: str) -> str:
         hashed = hash_password("mySecureP@ss123")
         # Returns: "$2b$12$..."
     """
+    # Defensive check: bcrypt supports up to 72 bytes of password input. If a
+    # caller provides a longer password (in bytes) the underlying bcrypt
+    # implementation may raise an opaque error. Validate here and raise a
+    # clear ValueError so the API can return a useful HTTP 400/422 message.
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError(
+            "password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])"
+        )
+
     return pwd_context.hash(password)
 
 

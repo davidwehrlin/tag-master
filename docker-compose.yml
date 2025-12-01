@@ -1,19 +1,29 @@
-version: '3.8'
+#############################################################
+# Local development Docker Compose
+#
+# This compose file is intended for local development only. It
+# configures a Postgres instance and the API container with
+# convenient defaults (bind-mounts, reload, env_file). For
+# production or CI, keep a separate compose file or override
+# settings with additional compose files or profiles.
+#############################################################
 
 services:
   db:
     image: postgres:15-alpine
     container_name: tagmaster-db
-    environment:
-      POSTGRES_USER: tagmaster
-      POSTGRES_PASSWORD: dev_password
-      POSTGRES_DB: tagmaster_dev
+    env_file:
+      - ./backend/.env
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tagmaster"]
+      # Use Compose variable substitution so the healthcheck checks the
+      # configured database rather than assuming a DB name equal to the user.
+      # This requires a project-level `.env` file (created below) or environment
+      # variables to be present when `docker compose` runs.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,14 +37,8 @@ services:
     container_name: tagmaster-api
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://tagmaster:dev_password@db:5432/tagmaster_dev
-      JWT_SECRET_KEY: dev_secret_key_change_in_production_minimum_32_characters
-      JWT_ALGORITHM: HS256
-      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 1440
-      CORS_ORIGINS: "http://localhost:3000,http://localhost:8080"
-      RATE_LIMIT_PER_MINUTE: 50
-      ENVIRONMENT: development
+    env_file:
+      - ./backend/.env
     depends_on:
       db:
         condition: service_healthy

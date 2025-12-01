@@ -8,7 +8,8 @@ RUN apk add --no-cache gcc musl-dev postgresql-dev
 
 # Copy requirements and install
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Install dependencies system-wide in builder so runtime image can reuse /usr/local
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
 FROM python:3.11-alpine
@@ -19,8 +20,8 @@ WORKDIR /app
 RUN apk add --no-cache postgresql-libs libffi
 
 # Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder /usr/local /usr/local
+ENV PATH=/usr/local/bin:$PATH
 
 # Copy application code
 COPY app /app/app
@@ -28,7 +29,7 @@ COPY alembic /app/alembic
 COPY alembic.ini /app/
 
 # Create non-root user
-RUN adduser -D appuser && chown -R appuser:appuser /app
+RUN adduser -D appuser && chown -R appuser:appuser /app /usr/local
 USER appuser
 
 # Expose port

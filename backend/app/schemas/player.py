@@ -62,6 +62,14 @@ class PlayerRegister(BaseModel):
             raise ValueError("Password must contain at least one lowercase letter")
         if not re.search(r"\d", v):
             raise ValueError("Password must contain at least one number")
+        # bcrypt has a 72-byte input limitation. Validate the UTF-8 encoded
+        # length here so callers receive a clear 422 validation error instead
+        # of a lower-level hashing error from the bcrypt library.
+        if len(v.encode("utf-8")) > 72:
+            # Match guidance commonly shown by bcrypt libraries.
+            raise ValueError(
+                "password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])"
+            )
         return v
     
     @field_validator("name")
@@ -231,6 +239,11 @@ class PlayerUpdate(BaseModel):
             raise ValueError("Password must contain at least one lowercase letter")
         if not re.search(r"\d", v):
             raise ValueError("Password must contain at least one number")
+        # Validate bcrypt 72-byte UTF-8 limit for update passwords too
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError(
+                "password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])"
+            )
         return v
     
     @field_validator("name")
